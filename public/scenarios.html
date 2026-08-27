@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Scenarios - Software Usability Testing Recorder</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div id="navbar-container"></div>
+
+  <div class="container">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Usability Test Scenarios</h1>
+        <p class="page-subtitle">Record user testing sessions, task workflows, and pass/fail observations</p>
+      </div>
+    </div>
+
+    <div id="alert-container"></div>
+
+    <!-- Record Test Scenario Form -->
+    <div class="card">
+      <div class="card-title">📝 Record Test Scenario</div>
+      <form id="scenarioForm" onsubmit="handleRecordScenario(event)">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="project_id">Select Project *</label>
+            <select id="project_id" required>
+              <option value="">Loading projects...</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="scenario_name">Scenario Name *</label>
+            <input type="text" id="scenario_name" placeholder="e.g. User Signup & Email Verification" required>
+          </div>
+          <div class="form-group">
+            <label for="test_result">Test Result *</label>
+            <select id="test_result" required>
+              <option value="Pass">Pass</option>
+              <option value="Fail">Fail</option>
+              <option value="Inconclusive">Inconclusive</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="task_description">Task Description</label>
+          <textarea id="task_description" placeholder="Describe the specific steps or instructions given to the user during testing..."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="tester_notes">Tester Notes & Behavioral Observations</label>
+          <textarea id="tester_notes" placeholder="Notes on user confusion, hesitation, mouse movement patterns, time to complete task..."></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Save Test Scenario</button>
+      </form>
+    </div>
+
+    <!-- Recorded Scenarios Table -->
+    <div class="card">
+      <div class="card-title">📊 Recorded Test Scenarios</div>
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Project</th>
+              <th>Scenario Name</th>
+              <th>Task Description</th>
+              <th>Result</th>
+              <th>Tester Notes</th>
+              <th>Recorded By</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody id="scenarios-table">
+            <tr>
+              <td colspan="8" class="empty-state">Loading recorded test scenarios...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    Software Usability Testing Recorder &copy; 2026 - Usability Engineering Portal
+  </footer>
+
+  <script src="script.js"></script>
+  <script>
+    const user = checkAuth();
+    renderNavbar();
+
+    async function loadScenarios() {
+      try {
+        const res = await fetch('/api/scenarios');
+        const scenarios = await res.json();
+        const tbody = document.getElementById('scenarios-table');
+
+        if (scenarios.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No test scenarios recorded yet.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = scenarios.map(s => {
+          let resultClass = 'result-pass';
+          if (s.test_result === 'Fail') resultClass = 'result-fail';
+          if (s.test_result === 'Inconclusive') resultClass = 'result-inconclusive';
+
+          return `
+            <tr>
+              <td>#${s.id}</td>
+              <td><strong>${s.project_name}</strong></td>
+              <td>${s.scenario_name}</td>
+              <td>${s.task_description || '<em style="color: var(--text-muted);">-</em>'}</td>
+              <td><span class="badge ${resultClass}">${s.test_result}</span></td>
+              <td>${s.tester_notes || '<em style="color: var(--text-muted);">-</em>'}</td>
+              <td>${s.created_by || 'Tester'}</td>
+              <td>${formatDate(s.created_at)}</td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        console.error('Failed to load scenarios:', err);
+        showAlert('Failed to load test scenarios.');
+      }
+    }
+
+    async function handleRecordScenario(e) {
+      e.preventDefault();
+      const project_id = document.getElementById('project_id').value;
+      const scenario_name = document.getElementById('scenario_name').value;
+      const test_result = document.getElementById('test_result').value;
+      const task_description = document.getElementById('task_description').value;
+      const tester_notes = document.getElementById('tester_notes').value;
+
+      try {
+        const res = await fetch('/api/scenarios', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            project_id,
+            scenario_name,
+            test_result,
+            task_description,
+            tester_notes,
+            created_by: user ? user.username : 'Tester'
+          })
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          showAlert('Test scenario recorded successfully!', 'success');
+          document.getElementById('scenarioForm').reset();
+          fetchProjectsSelectOptions('project_id');
+          loadScenarios();
+        } else {
+          showAlert(data.error || 'Failed to record scenario.');
+        }
+      } catch (err) {
+        showAlert('Server error while recording scenario.');
+      }
+    }
+
+    if (user) {
+      fetchProjectsSelectOptions('project_id');
+      loadScenarios();
+    }
+  </script>
+</body>
+</html>

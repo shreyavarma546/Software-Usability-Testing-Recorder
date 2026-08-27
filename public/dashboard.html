@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - Software Usability Testing Recorder</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div id="navbar-container"></div>
+
+  <div class="container">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Usability Testing Dashboard</h1>
+        <p class="page-subtitle">Overview of projects, testing scenarios, open issues, and design adjustments</p>
+      </div>
+    </div>
+
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-info">
+          <h3>Total Projects</h3>
+          <div class="metric-value" id="stat-projects">0</div>
+        </div>
+        <div class="metric-icon icon-blue">📁</div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-info">
+          <h3>Test Scenarios</h3>
+          <div class="metric-value" id="stat-scenarios">0</div>
+        </div>
+        <div class="metric-icon icon-purple">🧪</div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-info">
+          <h3>Open UX Issues</h3>
+          <div class="metric-value" id="stat-open-issues">0</div>
+        </div>
+        <div class="metric-icon icon-orange">⚠️</div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-info">
+          <h3>Fixed UX Issues</h3>
+          <div class="metric-value" id="stat-fixed-issues">0</div>
+        </div>
+        <div class="metric-icon icon-green">✅</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <span>Recent UX Issues</span>
+      </div>
+      
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Project</th>
+              <th>Issue Title</th>
+              <th>Severity</th>
+              <th>Status</th>
+              <th>Reported Date</th>
+            </tr>
+          </thead>
+          <tbody id="recent-issues-table">
+            <tr>
+              <td colspan="5" class="empty-state">Loading recent issues...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    Software Usability Testing Recorder &copy; 2026 - Usability Engineering Portal
+  </footer>
+
+  <script src="script.js"></script>
+  <script>
+    const user = checkAuth();
+    renderNavbar();
+
+    async function loadDashboardStats() {
+      try {
+        const response = await fetch('/api/dashboard/stats');
+        const data = await response.json();
+
+        document.getElementById('stat-projects').textContent = data.totalProjects || 0;
+        document.getElementById('stat-scenarios').textContent = data.totalScenarios || 0;
+        document.getElementById('stat-open-issues').textContent = data.openIssues || 0;
+        document.getElementById('stat-fixed-issues').textContent = data.fixedIssues || 0;
+
+        const tableBody = document.getElementById('recent-issues-table');
+        if (!data.recentIssues || data.recentIssues.length === 0) {
+          tableBody.innerHTML = '<tr><td colspan="5" class="empty-state">No recent UX issues found.</td></tr>';
+          return;
+        }
+
+        tableBody.innerHTML = data.recentIssues.map(issue => {
+          let sevClass = 'sev-low';
+          if (issue.severity === 'Medium') sevClass = 'sev-medium';
+          if (issue.severity === 'High') sevClass = 'sev-high';
+
+          let statusClass = 'status-open';
+          if (issue.status === 'In Progress') statusClass = 'status-in-progress';
+          if (issue.status === 'Fixed') statusClass = 'status-fixed';
+
+          return `
+            <tr>
+              <td><strong>${issue.project_name}</strong></td>
+              <td>${issue.title}</td>
+              <td><span class="badge ${sevClass}">${issue.severity}</span></td>
+              <td><span class="badge ${statusClass}">${issue.status}</span></td>
+              <td>${formatDate(issue.created_at)}</td>
+            </tr>
+          `;
+        }).join('');
+
+      } catch (err) {
+        console.error('Failed to load dashboard stats:', err);
+      }
+    }
+
+    if (user) {
+      loadDashboardStats();
+    }
+  </script>
+</body>
+</html>

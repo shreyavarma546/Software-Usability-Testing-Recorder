@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - Software Usability Testing Recorder</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div class="login-wrapper">
+    <div class="login-card">
+      <div class="login-header">
+        <div class="nav-brand-icon" style="margin: 0 auto; width: 48px; height: 48px; font-size: 1.6rem;">🧪</div>
+        <h2 style="font-size: 1.35rem;">Software Usability Testing Recorder</h2>
+      </div>
+
+      <div id="alert-container"></div>
+
+      <div class="quick-roles">
+        <p>Demo Quick Login Credentials:</p>
+        <div class="role-buttons">
+          <button type="button" class="btn-quick-role" onclick="fillLogin('admin', 'admin123', 'admin')">Admin</button>
+          <button type="button" class="btn-quick-role" onclick="fillLogin('tester', 'tester123', 'tester')">Tester</button>
+          <button type="button" class="btn-quick-role" onclick="fillLogin('designer', 'designer123', 'designer')">Designer</button>
+        </div>
+      </div>
+
+      <form id="loginForm" onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label for="username">Username</label>
+          <input type="text" id="username" placeholder="Enter username" required>
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" placeholder="Enter password" required>
+        </div>
+
+        <div class="form-group">
+          <label for="role">Role Selection</label>
+          <select id="role" required>
+            <option value="admin">Admin</option>
+            <option value="tester">Tester</option>
+            <option value="designer">Designer/Developer</option>
+          </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">Log In</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+  <script>
+    // Redirect if already logged in
+    checkAuth();
+
+    function fillLogin(user, pass, role) {
+      document.getElementById('username').value = user;
+      document.getElementById('password').value = pass;
+      document.getElementById('role').value = role;
+    }
+
+    async function handleLogin(e) {
+      e.preventDefault();
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      const role = document.getElementById('role').value;
+
+      try {
+        const response = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password, role })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+          localStorage.setItem('sutr_user', JSON.stringify(data.user));
+          window.location.href = 'dashboard.html';
+        } else {
+          showAlert(data.error || 'Login failed', 'danger');
+        }
+      } catch (err) {
+        console.error('Login error:', err);
+        showAlert('Server connection error. Please try again.', 'danger');
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Design Adjustments - Software Usability Testing Recorder</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div id="navbar-container"></div>
+
+  <div class="container">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">UI Design Adjustments</h1>
+        <p class="page-subtitle">Log layout modifications, color contrast fixes, and mark UX issues as resolved</p>
+      </div>
+    </div>
+
+    <div id="alert-container"></div>
+
+    <!-- Add Design Adjustment Form -->
+    <div class="card">
+      <div class="card-title">🎨 Add UI Design Adjustment</div>
+      <form id="adjustmentForm" onsubmit="handleAddAdjustment(event)">
+        <div class="form-row">
+          <div class="form-group" style="flex: 2;">
+            <label for="issue_id">Select Related UX Issue *</label>
+            <select id="issue_id" required>
+              <option value="">Loading issues...</option>
+            </select>
+          </div>
+          <div class="form-group" style="flex: 1;">
+            <label for="updated_by">Updated By *</label>
+            <input type="text" id="updated_by" required readonly>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="adjustment_description">Adjustment Description *</label>
+          <textarea id="adjustment_description" placeholder="Describe the UI changes made (e.g. Increased CTA button padding from 8px to 16px, updated font contrast ratio to meet WCAG AA standards)..." required></textarea>
+        </div>
+
+        <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.5rem;">
+          <input type="checkbox" id="mark_fixed" style="width: auto; height: 18px; width: 18px; cursor: pointer;">
+          <label for="mark_fixed" style="margin-bottom: 0; cursor: pointer; font-weight: 600; color: var(--success);">
+            Mark Related UX Issue as FIXED
+          </label>
+        </div>
+
+        <button type="submit" class="btn btn-success">Save Design Adjustment</button>
+      </form>
+    </div>
+
+    <!-- Design Adjustments History Table -->
+    <div class="card">
+      <div class="card-title">📐 UI Adjustment History</div>
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Project</th>
+              <th>Related UX Issue</th>
+              <th>Adjustment Details</th>
+              <th>Issue Status</th>
+              <th>Updated By</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody id="adjustments-table">
+            <tr>
+              <td colspan="7" class="empty-state">Loading design adjustments...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    Software Usability Testing Recorder &copy; 2026 - Usability Engineering Portal
+  </footer>
+
+  <script src="script.js"></script>
+  <script>
+    const user = checkAuth();
+    renderNavbar();
+
+    if (user) {
+      document.getElementById('updated_by').value = `${user.username} (${user.role})`;
+    }
+
+    async function loadIssuesSelectOptions() {
+      const selectElem = document.getElementById('issue_id');
+      if (!selectElem) return;
+
+      try {
+        const res = await fetch('/api/issues');
+        const issues = await res.json();
+
+        selectElem.innerHTML = '<option value="">-- Select UX Issue --</option>';
+        issues.forEach(i => {
+          selectElem.innerHTML += `
+            <option value="${i.id}">
+              [${i.project_name}] #${i.id}: ${i.title} (${i.severity} - ${i.status})
+            </option>
+          `;
+        });
+      } catch (err) {
+        console.error('Failed to fetch issues options:', err);
+      }
+    }
+
+    async function loadAdjustments() {
+      try {
+        const res = await fetch('/api/adjustments');
+        const adjustments = await res.json();
+        const tbody = document.getElementById('adjustments-table');
+
+        if (adjustments.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No design adjustments logged yet.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = adjustments.map(a => {
+          let statusClass = 'status-open';
+          if (a.issue_status === 'In Progress') statusClass = 'status-in-progress';
+          if (a.issue_status === 'Fixed') statusClass = 'status-fixed';
+
+          return `
+            <tr>
+              <td>#${a.id}</td>
+              <td><strong>${a.project_name}</strong></td>
+              <td>#${a.issue_id}: ${a.issue_title}</td>
+              <td>${a.adjustment_description}</td>
+              <td><span class="badge ${statusClass}">${a.issue_status}</span></td>
+              <td>${a.updated_by}</td>
+              <td>${formatDate(a.created_at)}</td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        console.error('Failed to load adjustments:', err);
+        showAlert('Failed to load design adjustments list.');
+      }
+    }
+
+    async function handleAddAdjustment(e) {
+      e.preventDefault();
+      const issue_id = document.getElementById('issue_id').value;
+      const adjustment_description = document.getElementById('adjustment_description').value;
+      const updated_by = document.getElementById('updated_by').value;
+      const mark_fixed = document.getElementById('mark_fixed').checked;
+
+      try {
+        const res = await fetch('/api/adjustments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            issue_id,
+            adjustment_description,
+            updated_by,
+            mark_fixed
+          })
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          showAlert('UI Design Adjustment added successfully!', 'success');
+          document.getElementById('adjustmentForm').reset();
+          if (user) {
+            document.getElementById('updated_by').value = `${user.username} (${user.role})`;
+          }
+          loadIssuesSelectOptions();
+          loadAdjustments();
+        } else {
+          showAlert(data.error || 'Failed to add design adjustment.');
+        }
+      } catch (err) {
+        showAlert('Server error adding design adjustment.');
+      }
+    }
+
+    if (user) {
+      loadIssuesSelectOptions();
+      loadAdjustments();
+    }
+  </script>
+</body>
+</html>

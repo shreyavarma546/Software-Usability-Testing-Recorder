@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UX Issues - Software Usability Testing Recorder</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div id="navbar-container"></div>
+
+  <div class="container">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">UX Issues Log</h1>
+        <p class="page-subtitle">Report, categorize by severity, and monitor resolution of usability flaws</p>
+      </div>
+    </div>
+
+    <div id="alert-container"></div>
+
+    <!-- Report UX Issue Form -->
+    <div class="card">
+      <div class="card-title">⚠️ Report UX Issue</div>
+      <form id="issueForm" onsubmit="handleReportIssue(event)">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="project_id">Select Project *</label>
+            <select id="project_id" required>
+              <option value="">Loading projects...</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="title">Issue Title *</label>
+            <input type="text" id="title" placeholder="e.g. Checkout button hidden on mobile screen" required>
+          </div>
+          <div class="form-group">
+            <label for="severity">Severity Level *</label>
+            <select id="severity" required>
+              <option value="Low">Low</option>
+              <option value="Medium">Medium</option>
+              <option value="High">High</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="status">Initial Status</label>
+            <select id="status">
+              <option value="Open">Open</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Fixed">Fixed</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="description">Detailed Issue Description</label>
+          <textarea id="description" placeholder="Describe the UI/UX problem, exact screen location, user feedback, and expected behavior..."></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Report UX Issue</button>
+      </form>
+    </div>
+
+    <!-- UX Issues List Table -->
+    <div class="card">
+      <div class="card-title">📋 Reported UX Issues</div>
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Project</th>
+              <th>Title & Description</th>
+              <th>Severity</th>
+              <th>Status</th>
+              <th>Reported By</th>
+              <th>Date</th>
+              <th style="text-align: right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="issues-table">
+            <tr>
+              <td colspan="8" class="empty-state">Loading UX issues...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    Software Usability Testing Recorder &copy; 2026 - Usability Engineering Portal
+  </footer>
+
+  <script src="script.js"></script>
+  <script>
+    const user = checkAuth();
+    renderNavbar();
+
+    async function loadIssues() {
+      try {
+        const res = await fetch('/api/issues');
+        const issues = await res.json();
+        const tbody = document.getElementById('issues-table');
+
+        if (issues.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No UX issues reported yet.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = issues.map(i => {
+          let sevClass = 'sev-low';
+          if (i.severity === 'Medium') sevClass = 'sev-medium';
+          if (i.severity === 'High') sevClass = 'sev-high';
+
+          let statusClass = 'status-open';
+          if (i.status === 'In Progress') statusClass = 'status-in-progress';
+          if (i.status === 'Fixed') statusClass = 'status-fixed';
+
+          return `
+            <tr>
+              <td>#${i.id}</td>
+              <td><strong>${i.project_name}</strong></td>
+              <td>
+                <div style="font-weight: 600; color: var(--text-main);">${i.title}</div>
+                <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">${i.description || 'No additional description'}</div>
+              </td>
+              <td><span class="badge ${sevClass}">${i.severity}</span></td>
+              <td>
+                <select class="status-select" onchange="updateIssueStatus(${i.id}, this.value)" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; width: auto;">
+                  <option value="Open" ${i.status === 'Open' ? 'selected' : ''}>Open</option>
+                  <option value="In Progress" ${i.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
+                  <option value="Fixed" ${i.status === 'Fixed' ? 'selected' : ''}>Fixed</option>
+                </select>
+              </td>
+              <td>${i.created_by || 'Tester'}</td>
+              <td>${formatDate(i.created_at)}</td>
+              <td style="text-align: right;">
+                <button onclick="deleteIssue(${i.id}, '${i.title.replace(/'/g, "\\'")}')" class="btn btn-danger btn-sm">Delete</button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        console.error('Failed to load UX issues:', err);
+        showAlert('Failed to load UX issues list.');
+      }
+    }
+
+    async function handleReportIssue(e) {
+      e.preventDefault();
+      const project_id = document.getElementById('project_id').value;
+      const title = document.getElementById('title').value;
+      const severity = document.getElementById('severity').value;
+      const status = document.getElementById('status').value;
+      const description = document.getElementById('description').value;
+
+      try {
+        const res = await fetch('/api/issues', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            project_id,
+            title,
+            severity,
+            status,
+            description,
+            created_by: user ? user.username : 'Tester'
+          })
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          showAlert('UX Issue reported successfully!', 'success');
+          document.getElementById('issueForm').reset();
+          fetchProjectsSelectOptions('project_id');
+          loadIssues();
+        } else {
+          showAlert(data.error || 'Failed to report issue.');
+        }
+      } catch (err) {
+        showAlert('Server error reporting UX issue.');
+      }
+    }
+
+    async function updateIssueStatus(id, newStatus) {
+      try {
+        const res = await fetch(`/api/issues/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: newStatus })
+        });
+        if (res.ok) {
+          showAlert(`Issue #${id} status changed to ${newStatus}`, 'success');
+          loadIssues();
+        } else {
+          showAlert('Failed to update issue status.');
+        }
+      } catch (err) {
+        showAlert('Server error updating issue status.');
+      }
+    }
+
+    async function deleteIssue(id, title) {
+      if (!confirm(`Are you sure you want to delete issue "${title}"?`)) return;
+      try {
+        const res = await fetch(`/api/issues/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+          showAlert('Issue deleted successfully.', 'success');
+          loadIssues();
+        } else {
+          showAlert('Failed to delete issue.');
+        }
+      } catch (err) {
+        showAlert('Server error deleting issue.');
+      }
+    }
+
+    if (user) {
+      fetchProjectsSelectOptions('project_id');
+      loadIssues();
+    }
+  </script>
+</body>
+</html>
